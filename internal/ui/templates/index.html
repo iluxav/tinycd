@@ -9,7 +9,7 @@
 {{if .Apps}}
 <div class="card" style="padding: 0;">
 <table>
-  <thead><tr><th>Name</th><th>Repo</th><th>Ref</th><th>URL</th><th>Scale</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Repo</th><th>Ref</th><th>URL</th><th>Scale</th><th style="text-align: right;">Actions</th></tr></thead>
   <tbody>
   {{range .Apps}}
     <tr>
@@ -17,10 +17,20 @@
       <td><code class="mono">{{.Repo}}</code></td>
       <td><code class="mono">{{if .Ref}}{{.Ref}}{{else}}HEAD{{end}}</code></td>
       <td><a href="{{.URL}}" target="_blank">{{.URL}}</a></td>
-      <td>{{.Scale}}</td>
-      <td style="text-align: right;">
+      <td>
+        <form class="inline" method="POST" action="/apps/{{.Name}}/scale" style="display: flex; gap: 4px; align-items: center;">
+          <input type="number" name="scale" value="{{.Scale}}" min="1" style="width: 60px; padding: 4px 6px;">
+          <button class="btn" type="submit" style="padding: 4px 8px; font-size: 12px;">apply</button>
+        </form>
+      </td>
+      <td style="text-align: right; white-space: nowrap;">
+        <form class="inline" method="POST" action="/apps/{{.Name}}/redeploy"
+              onsubmit="return confirm('Pull latest and rebuild {{.Name}}?');">
+          <button class="btn" type="submit">redeploy</button>
+        </form>
         <form class="inline" method="POST" action="/apps/{{.Name}}/restart"><button class="btn" type="submit">restart</button></form>
         <form class="inline" method="POST" action="/apps/{{.Name}}/stop"><button class="btn" type="submit">stop</button></form>
+        <a class="btn" href="/apps/{{.Name}}">env / logs…</a>
       </td>
     </tr>
   {{end}}
