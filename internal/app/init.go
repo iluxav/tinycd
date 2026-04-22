@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/iluxa/tcd/internal/compose"
-	"github.com/iluxa/tcd/internal/config"
-	"github.com/iluxa/tcd/internal/dc"
-	"github.com/iluxa/tcd/internal/sh"
+	"github.com/iluxa/tinycd/internal/compose"
+	"github.com/iluxa/tinycd/internal/config"
+	"github.com/iluxa/tinycd/internal/dc"
+	"github.com/iluxa/tinycd/internal/sh"
 )
 
 func newInitCmd() *cobra.Command {

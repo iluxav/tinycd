@@ -3,7 +3,7 @@ package dc
 import (
 	"fmt"
 
-	"github.com/iluxa/tcd/internal/sh"
+	"github.com/iluxa/tinycd/internal/sh"
 )
 
 // Client wraps `docker compose -f <root> -p <project>`.

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# tcd installer — curl -fsSL https://raw.githubusercontent.com/iluxa/tcd/main/install.sh | bash
+# tcd installer — curl -fsSL https://raw.githubusercontent.com/iluxa/tinycd/main/install.sh | bash
 #
 # Environment variables:
 #   TCD_VERSION  — tag to install (default: latest)
-#   TCD_REPO     — GitHub repo (default: iluxa/tcd)
+#   TCD_REPO     — GitHub repo (default: iluxa/tinycd)
 #   PREFIX       — install prefix (default: /usr/local)
 #   TCD_USER     — if set to 1, install to ~/.local/bin instead
 
 set -euo pipefail
 
-REPO="${TCD_REPO:-iluxa/tcd}"
+REPO="${TCD_REPO:-iluxa/tinycd}"
 VERSION="${TCD_VERSION:-latest}"
 PREFIX="${PREFIX:-/usr/local}"
 

@@ -9,19 +9,19 @@
 
 ## Decisions
 
-| Area | Choice | Rationale |
-|---|---|---|
-| Compose topology | Root compose with `include:` list | Unified `docker compose up`, repo compose preserved |
-| Proxy | Traefik v3 bootstrapped by `tcd init` | Self-contained, "turn-key" per PRD |
-| Primary service | `tcd.primary=true` label → `--service` flag → first service | Works for tcd-aware repos and repos-we-don't-control |
-| Override mechanism | Generated `override.yml` merged via `include: path: [repo.yml, override.yml]` | Zero mutation of repo files |
-| Env vars | `--env-file` only, copied once, preserved on re-deploy | Clean, matches `docker compose` idiom |
-| Git ref | `--ref` flag, defaults to repo default branch | Explicit reproducibility |
-| CLI framework | `spf13/cobra` | De facto standard for Go CLIs |
-| Module path | `github.com/iluxa/tcd` | |
-| Build | `Makefile` with `build` + `build-linux` targets | |
-| `tcd logs` | One-shot dump; `-f` flag to follow | Matches `docker compose logs` default |
-| Distribution | GitHub Actions release → cross-compiled binaries + `install.sh` | Curl-installable |
+| Area               | Choice                                                                        | Rationale                                            |
+| ------------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Compose topology   | Root compose with `include:` list                                             | Unified `docker compose up`, repo compose preserved  |
+| Proxy              | Traefik v3 bootstrapped by `tcd init`                                         | Self-contained, "turn-key" per PRD                   |
+| Primary service    | `tcd.primary=true` label → `--service` flag → first service                   | Works for tcd-aware repos and repos-we-don't-control |
+| Override mechanism | Generated `override.yml` merged via `include: path: [repo.yml, override.yml]` | Zero mutation of repo files                          |
+| Env vars           | `--env-file` only, copied once, preserved on re-deploy                        | Clean, matches `docker compose` idiom                |
+| Git ref            | `--ref` flag, defaults to repo default branch                                 | Explicit reproducibility                             |
+| CLI framework      | `spf13/cobra`                                                                 | De facto standard for Go CLIs                        |
+| Module path        | `github.com/iluxa/tinycd`                                                     |                                                      |
+| Build              | `Makefile` with `build` + `build-linux` targets                               |                                                      |
+| `tcd logs`         | One-shot dump; `-f` flag to follow                                            | Matches `docker compose logs` default                |
+| Distribution       | GitHub Actions release → cross-compiled binaries + `install.sh`               | Curl-installable                                     |
 
 ## File Layout
 
@@ -81,11 +81,11 @@ include:
 5. Detect `compose.yml` / `docker-compose.yml` in repo. If missing, generate `compose.generated.yml` using repo's Dockerfile (service named `<app>`, expose `--port`).
 6. Resolve primary service: `tcd.primary=true` label → `--service` flag → first service. Save in state.
 7. Write `apps/<app>/override.yml` with `env_file`, `networks: [tcd-proxy]`, and Traefik labels:
-    - `traefik.enable=true`
-    - `traefik.http.routers.<app>.rule=Host(` `<app>.<domain>` `)`
-    - `traefik.http.routers.<app>.entrypoints=websecure`
-    - `traefik.http.routers.<app>.tls.certresolver=le`
-    - `traefik.http.services.<app>.loadbalancer.server.port=<port>`
+   - `traefik.enable=true`
+   - `traefik.http.routers.<app>.rule=Host(` `<app>.<domain>` `)`
+   - `traefik.http.routers.<app>.entrypoints=websecure`
+   - `traefik.http.routers.<app>.tls.certresolver=le`
+   - `traefik.http.services.<app>.loadbalancer.server.port=<port>`
 8. Update root `compose.yml` `include:` list to reference this app's compose + override (additive + idempotent).
 9. Run `docker compose -f /var/lib/tcd/compose.yml -p tcd up -d --build --scale <primary>=<scale>`.
 10. Write `apps/<app>/state.json`.
@@ -116,4 +116,4 @@ include:
 - `.github/workflows/release.yml` triggered on `v*` tag push.
 - Matrix: `linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64`.
 - Artifacts: `tcd_<version>_<os>_<arch>.tar.gz` (+ `.zip` for Windows) with `SHA256SUMS`.
-- `install.sh`: detects OS/arch, resolves latest (or `$TCD_VERSION`), downloads, verifies checksum, installs to `/usr/local/bin/tcd`.
+- `install.sh`: detects OS/arch, resolves latest (or `$TCD_VERSION`), downloads, verifies checksum, installs to `/usr/local/bin/tcd`

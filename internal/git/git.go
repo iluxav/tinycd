@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/iluxa/tcd/internal/sh"
+	"github.com/iluxa/tinycd/internal/sh"
 )
 
 // CloneOrPull clones to dir if missing, otherwise fetches + resets to origin/<ref>.

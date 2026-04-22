@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/iluxa/tcd/internal/app"
+	"github.com/iluxa/tinycd/internal/app"
 )
 
 var version = "dev"
