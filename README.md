@@ -7,13 +7,13 @@ See [CLAUDE.md](CLAUDE.md) for the product spec and [docs/plans/2026-04-22-tcd-d
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/iluxa/tinycd/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/iluxav/tinycd/main/install.sh | bash
 ```
 
 Or pin a version:
 
 ```bash
-TCD_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/iluxa/tinycd/main/install.sh | bash
+TCD_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/iluxav/tinycd/main/install.sh | bash
 ```
 
 ## Usage

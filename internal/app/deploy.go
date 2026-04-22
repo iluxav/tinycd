@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/iluxa/tinycd/internal/compose"
-	"github.com/iluxa/tinycd/internal/config"
-	"github.com/iluxa/tinycd/internal/dc"
-	gitpkg "github.com/iluxa/tinycd/internal/git"
+	"github.com/iluxav/tinycd/internal/compose"
+	"github.com/iluxav/tinycd/internal/config"
+	"github.com/iluxav/tinycd/internal/dc"
+	gitpkg "github.com/iluxav/tinycd/internal/git"
 )
 
 func newDeployCmd() *cobra.Command {

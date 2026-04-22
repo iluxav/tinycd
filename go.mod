@@ -1,4 +1,4 @@
-module github.com/iluxa/tinycd
+module github.com/iluxav/tinycd
 
 go 1.24.3
 
