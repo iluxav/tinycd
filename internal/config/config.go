@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	Domain     string `yaml:"domain"`
-	ACMEEmail  string `yaml:"acme_email,omitempty"`
-	AppsDir    string `yaml:"apps_dir"`
-	StateDir   string `yaml:"state_dir"`
-	SSHKeyPath string `yaml:"ssh_key_path"`
+	Domain        string   `yaml:"domain"`
+	PublicDomains []string `yaml:"public_domains,omitempty"`
+	ACMEEmail     string   `yaml:"acme_email,omitempty"`
+	AppsDir       string   `yaml:"apps_dir"`
+	StateDir      string   `yaml:"state_dir"`
+	SSHKeyPath    string   `yaml:"ssh_key_path"`
 }
 
 // DefaultConfigDir returns ~/.config/tcd

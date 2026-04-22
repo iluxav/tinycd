@@ -95,6 +95,9 @@ func newDeployCmd() *cobra.Command {
 			if cfg.ACMEEmail != "" {
 				certResolver = "le"
 			}
+			// Auto-derive aliases from config.PublicDomains, then add user-supplied --alias on top.
+			effectiveAliases := append([]string(nil), autoAliases(appName, cfg.PublicDomains)...)
+			effectiveAliases = append(effectiveAliases, aliases...)
 			if err := compose.RenderOverride(compose.OverrideInput{
 				AppName:      appName,
 				PrimarySvc:   primary,
@@ -103,7 +106,7 @@ func newDeployCmd() *cobra.Command {
 				EnvFilePath:  envRel,
 				NetworkName:  "tcd-proxy",
 				CertResolver: certResolver,
-				Aliases:      aliases,
+				Aliases:      effectiveAliases,
 			}, overridePath); err != nil {
 				return err
 			}
@@ -138,7 +141,7 @@ func newDeployCmd() *cobra.Command {
 				return err
 			}
 
-			// State
+			// State — record the *full* alias list Traefik is matching on.
 			state := &config.AppState{
 				Name:         appName,
 				Repo:         repoInput,
@@ -149,7 +152,7 @@ func newDeployCmd() *cobra.Command {
 				Port:         port,
 				Scale:        scale,
 				URL:          fmt.Sprintf("http://%s.%s", appName, cfg.Domain),
-				Aliases:      aliases,
+				Aliases:      effectiveAliases,
 				EnvFile:      envTarget,
 				ComposeFile:  composePath,
 				OverrideFile: overridePath,
@@ -203,6 +206,18 @@ func shortCommit(c string) string {
 		return c[:7]
 	}
 	return c
+}
+
+// autoAliases derives `<app>.<publicDomain>` for each configured public domain.
+func autoAliases(appName string, publicDomains []string) []string {
+	out := make([]string, 0, len(publicDomains))
+	for _, pd := range publicDomains {
+		if pd == "" {
+			continue
+		}
+		out = append(out, appName+"."+pd)
+	}
+	return out
 }
 
 func generateFallbackCompose(path, appName string, port int) error {

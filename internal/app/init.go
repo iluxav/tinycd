@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -16,6 +17,7 @@ import (
 func newInitCmd() *cobra.Command {
 	var domain, email string
 	var stateDir string
+	var publicDomains []string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize tcd on this host",
@@ -83,15 +85,18 @@ func newInitCmd() *cobra.Command {
 			}
 
 			cfg := &config.Config{
-				Domain:     domain,
-				ACMEEmail:  email,
-				AppsDir:    appsDir,
-				StateDir:   stateDir,
-				SSHKeyPath: keyPath,
+				Domain:        domain,
+				PublicDomains: dedupe(publicDomains),
+				ACMEEmail:     email,
+				AppsDir:       appsDir,
+				StateDir:      stateDir,
+				SSHKeyPath:    keyPath,
 			}
 			if err := config.Save(cfg); err != nil {
 				return err
 			}
+
+			suggestEtunl(cfg)
 
 			pub, err := os.ReadFile(pubPath)
 			if err != nil {
@@ -99,6 +104,9 @@ func newInitCmd() *cobra.Command {
 			}
 			fmt.Println("tcd initialized.")
 			fmt.Printf("  domain:    %s\n", domain)
+			if len(cfg.PublicDomains) > 0 {
+				fmt.Printf("  public:    %v\n", cfg.PublicDomains)
+			}
 			fmt.Printf("  state:     %s\n", stateDir)
 			fmt.Printf("  ssh key:   %s\n", keyPath)
 			fmt.Println()
@@ -109,7 +117,55 @@ func newInitCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&domain, "domain", "", "base domain for apps (app.<domain>)")
+	cmd.Flags().StringArrayVar(&publicDomains, "public-domain", nil, "extra public base domain — every deploy auto-aliases <app>.<public-domain> (repeatable)")
 	cmd.Flags().StringVar(&email, "acme-email", "", "email for Let's Encrypt (enables TLS)")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "override state dir (default: /var/lib/tcd or ~/.local/share/tcd)")
 	return cmd
+}
+
+func dedupe(in []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
+}
+
+// suggestEtunl prints a hint if an etunl client config is present but its
+// server isn't in the public_domains list. No side effects, no prompts.
+func suggestEtunl(cfg *config.Config) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".etunl", "config.yaml"))
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		s := strings.TrimSpace(line)
+		if !strings.HasPrefix(s, "server:") {
+			continue
+		}
+		server := strings.Trim(strings.TrimSpace(strings.TrimPrefix(s, "server:")), `"'`)
+		if server == "" {
+			return
+		}
+		for _, pd := range cfg.PublicDomains {
+			if pd == server {
+				return
+			}
+		}
+		fmt.Printf("\nhint: detected etunl config with server=%s\n", server)
+		fmt.Printf("      re-run with --public-domain %s to auto-route deploys through it\n", server)
+		return
+	}
 }
