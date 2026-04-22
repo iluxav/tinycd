@@ -1,0 +1,33 @@
+{{define "settings.html"}}{{template "base" .}}{{end}}
+
+{{define "title"}}tcd — settings{{end}}
+{{define "meta"}}<a href="/">← back</a>{{end}}
+
+{{define "content"}}
+
+<h2>Change password</h2>
+<div class="card" style="max-width: 480px;">
+{{if .Error}}<p style="color: var(--danger); margin-top: 0;">{{.Error}}</p>{{end}}
+{{if .Success}}<p style="color: #059669; margin-top: 0;">{{.Success}}</p>{{end}}
+<form method="POST" action="/settings">
+  <div class="field">
+    <label>User</label>
+    <input type="text" value="{{.User}}" disabled>
+  </div>
+  <div class="field">
+    <label>Current password</label>
+    <input type="password" name="old_password" required>
+  </div>
+  <div class="field">
+    <label>New password</label>
+    <input type="password" name="new_password" required minlength="8">
+  </div>
+  <div class="field">
+    <label>Confirm new password</label>
+    <input type="password" name="new_password_confirm" required minlength="8">
+  </div>
+  <button class="btn" type="submit">Update password</button>
+</form>
+</div>
+
+{{end}}

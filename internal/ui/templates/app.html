@@ -1,0 +1,77 @@
+{{define "app.html"}}{{template "base" .}}{{end}}
+
+{{define "title"}}tcd — {{.App.Name}}{{end}}
+{{define "meta"}}<a href="/">← back</a>{{end}}
+
+{{define "content"}}
+
+<h2>{{.App.Name}}</h2>
+
+<div class="card">
+<dl class="kv">
+  <dt>repo</dt><dd>{{.App.Repo}}</dd>
+  <dt>repo URL</dt><dd>{{.App.RepoURL}}</dd>
+  <dt>ref</dt><dd>{{if .App.Ref}}{{.App.Ref}}{{else}}HEAD{{end}}</dd>
+  <dt>commit</dt><dd>{{.App.Commit | short}}</dd>
+  <dt>url</dt><dd><a href="{{.App.URL}}" target="_blank">{{.App.URL}}</a></dd>
+  {{range .App.Aliases}}<dt>alias</dt><dd>{{.}}</dd>{{end}}
+  <dt>port</dt><dd>{{.App.Port}}</dd>
+  <dt>scale</dt><dd>{{.App.Scale}}</dd>
+  <dt>service</dt><dd>{{.App.Service}}</dd>
+  <dt>compose</dt><dd>{{.App.ComposeFile}}</dd>
+  <dt>override</dt><dd>{{.App.OverrideFile}}</dd>
+</dl>
+</div>
+
+<div class="card">
+<div class="row">
+  <form class="inline" method="POST" action="/apps/{{.App.Name}}/restart"><button class="btn" type="submit">Restart</button></form>
+  <form class="inline" method="POST" action="/apps/{{.App.Name}}/stop"><button class="btn" type="submit">Stop</button></form>
+  <form class="inline" method="POST" action="/apps/{{.App.Name}}/rm" onsubmit="return confirm('Remove {{.App.Name}}? Containers will be torn down.');">
+    <button class="btn danger" type="submit">Remove</button>
+  </form>
+  <form class="inline" method="POST" action="/apps/{{.App.Name}}/rm" onsubmit="return confirm('Remove AND delete all data for {{.App.Name}}? This cannot be undone.');">
+    <input type="hidden" name="purge" value="true">
+    <button class="btn danger" type="submit">Remove + Purge</button>
+  </form>
+</div>
+</div>
+
+<h2>Container status</h2>
+<div class="card">
+<pre class="mono" style="font-size: 12px; white-space: pre-wrap; margin: 0;">{{.PsText}}</pre>
+</div>
+
+<h2>.env</h2>
+<div class="card">
+<form method="POST" action="/apps/{{.App.Name}}/env" enctype="multipart/form-data">
+  <div class="field">
+    <textarea name="envraw" rows="8" placeholder="KEY=value">{{.EnvRaw}}</textarea>
+  </div>
+  <button class="btn" type="submit">Save</button>
+  <span style="color: var(--muted); font-size: 13px; margin-left: 12px;">
+    Changes apply after next restart / redeploy.
+  </span>
+</form>
+</div>
+
+<h2>Logs <span style="font-weight: normal; color: var(--muted); text-transform: none; letter-spacing: 0;">(live)</span></h2>
+<pre class="log" id="logs"></pre>
+
+<script>
+(function() {
+  const box = document.getElementById('logs');
+  const es = new EventSource('/apps/{{.App.Name}}/logs?tail=200');
+  es.onmessage = (e) => {
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+    box.textContent += e.data + '\n';
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  };
+  es.onerror = () => {
+    box.textContent += '\n[connection lost]\n';
+  };
+  window.addEventListener('beforeunload', () => es.close());
+})();
+</script>
+
+{{end}}

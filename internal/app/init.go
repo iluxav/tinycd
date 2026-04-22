@@ -113,6 +113,8 @@ func newInitCmd() *cobra.Command {
 			fmt.Println("Add this deploy key to GitHub (Settings → Deploy keys, one per repo):")
 			fmt.Println()
 			fmt.Print(string(pub))
+			fmt.Println()
+			fmt.Println("Optional: install the web UI as a service — `tcd service install` (linux/systemd).")
 			return nil
 		},
 	}

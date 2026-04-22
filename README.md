@@ -73,6 +73,46 @@ etunl add --name hdrezka --type http --target localhost:80
 
 `tcd init` prints a hint when it detects `~/.etunl/config.yaml` but the etunl server isn't in `public_domains` yet.
 
+## Web UI
+
+`tcd` ships with an embedded web UI for managing apps — list, deploy, restart, stop, remove, edit `.env`, and stream live logs.
+
+```bash
+tcd ui                        # http://127.0.0.1:7070 (localhost-only)
+tcd ui --addr 127.0.0.1:9000  # custom port
+```
+
+**Set a password first** — the UI refuses to start without credentials:
+
+```bash
+tcd admin set-password admin    # prompts interactively, writes ~/.config/tcd/auth.yml
+tcd admin set-password --stdin <<<'my-long-password'   # for scripts
+```
+
+Forgot your password? Just run `tcd admin set-password admin` again — local shell access is already equivalent to auth.
+
+To run it as a background service (Linux/systemd):
+
+```bash
+tcd service install           # writes ~/.config/systemd/user/tcd-ui.service, enables + starts it
+tcd service status            # systemctl --user status tcd-ui
+tcd service uninstall
+```
+
+The service runs as your user (not root), so it reads the same `~/.config/tcd` state you've been using on the CLI. To keep it running after you log out:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+**Security model:**
+
+- Authentication is **required** — `tcd ui` refuses to start without credentials. Run `tcd admin set-password admin` (or any username) to bootstrap.
+- Passwords are stored as bcrypt hashes in `~/.config/tcd/auth.yml` (`chmod 600`).
+- Sessions are HMAC-signed cookies (`HttpOnly`, `SameSite=Strict`, 30-day TTL). Rotating the `session_key` in `auth.yml` invalidates all existing sessions.
+- Default bind is `127.0.0.1`. If you expose the UI publicly (e.g., front it with Traefik at `tcd.<domain>` with TLS), the `Secure` cookie flag should be enabled — see the note in `internal/ui/auth.go`.
+- You can change your password from `/settings` in the UI, or anytime with `tcd admin set-password <user>` on the host.
+
 ## Build from source
 
 ```bash

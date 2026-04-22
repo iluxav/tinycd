@@ -11,6 +11,7 @@ import (
 	"github.com/iluxav/tinycd/internal/compose"
 	"github.com/iluxav/tinycd/internal/config"
 	"github.com/iluxav/tinycd/internal/dc"
+	"github.com/iluxav/tinycd/internal/deploy"
 )
 
 func newClient(cfg *config.Config) *dc.Client {
@@ -82,21 +83,10 @@ func newRmCmd() *cobra.Command {
 				return err
 			}
 			name := args[0]
-			// Even if state is missing, attempt to remove include + purge dir.
-			if err := compose.RemoveInclude(cfg.RootComposeFile(), name); err != nil {
+			if err := deploy.Remove(cfg, name, purge); err != nil {
 				return err
 			}
-			// Bring the project up without the removed app so its containers get torn down.
-			client := newClient(cfg)
-			if err := client.Up(nil); err != nil {
-				// Best-effort: still try to purge.
-				fmt.Fprintf(os.Stderr, "warning: docker compose up after rm failed: %v\n", err)
-			}
 			if purge {
-				appDir := cfg.AppDir(name)
-				if err := os.RemoveAll(appDir); err != nil {
-					return fmt.Errorf("purge %s: %w", appDir, err)
-				}
 				fmt.Printf("✓ %s removed and purged\n", name)
 			} else {
 				fmt.Printf("✓ %s removed (use --purge to also delete %s)\n", name, cfg.AppDir(name))

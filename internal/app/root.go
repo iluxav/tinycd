@@ -22,6 +22,9 @@ func NewRootCmd(version string) *cobra.Command {
 		newLsCmd(),
 		newStatusCmd(),
 		newLogsCmd(),
+		newUICmd(),
+		newServiceCmd(),
+		newAdminCmd(),
 	)
 	return root
 }

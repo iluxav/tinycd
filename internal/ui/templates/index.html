@@ -1,0 +1,75 @@
+{{define "index.html"}}{{template "base" .}}{{end}}
+
+{{define "title"}}tcd — apps{{end}}
+{{define "meta"}}domain: <code class="mono">{{.Cfg.Domain}}</code>{{if .Cfg.PublicDomains}} · public: <code class="mono">{{range $i, $d := .Cfg.PublicDomains}}{{if $i}}, {{end}}{{$d}}{{end}}</code>{{end}}{{end}}
+
+{{define "content"}}
+
+<h2>Deployed apps</h2>
+{{if .Apps}}
+<div class="card" style="padding: 0;">
+<table>
+  <thead><tr><th>Name</th><th>Repo</th><th>Ref</th><th>URL</th><th>Scale</th><th></th></tr></thead>
+  <tbody>
+  {{range .Apps}}
+    <tr>
+      <td><a href="/apps/{{.Name}}"><strong>{{.Name}}</strong></a></td>
+      <td><code class="mono">{{.Repo}}</code></td>
+      <td><code class="mono">{{if .Ref}}{{.Ref}}{{else}}HEAD{{end}}</code></td>
+      <td><a href="{{.URL}}" target="_blank">{{.URL}}</a></td>
+      <td>{{.Scale}}</td>
+      <td style="text-align: right;">
+        <form class="inline" method="POST" action="/apps/{{.Name}}/restart"><button class="btn" type="submit">restart</button></form>
+        <form class="inline" method="POST" action="/apps/{{.Name}}/stop"><button class="btn" type="submit">stop</button></form>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<p style="color: var(--muted);">No apps deployed yet.</p>
+{{end}}
+
+<h2>Deploy a new app</h2>
+<div class="card">
+<form method="POST" action="/deploy" enctype="multipart/form-data">
+  <div class="field">
+    <label>Repo (<code>owner/name</code>, SSH or HTTPS URL)</label>
+    <input type="text" name="repo" placeholder="iluxav/hdrezka" required>
+  </div>
+  <div class="grid">
+    <div class="field">
+      <label>Name (optional)</label>
+      <input type="text" name="name" placeholder="derived from repo">
+    </div>
+    <div class="field">
+      <label>Ref (branch / tag / sha)</label>
+      <input type="text" name="ref" placeholder="default branch">
+    </div>
+    <div class="field">
+      <label>Port</label>
+      <input type="number" name="port" value="3000" required>
+    </div>
+    <div class="field">
+      <label>Scale</label>
+      <input type="number" name="scale" value="1" min="1" required>
+    </div>
+    <div class="field">
+      <label>Primary service (optional)</label>
+      <input type="text" name="service" placeholder="auto-detect">
+    </div>
+  </div>
+  <div class="field">
+    <label>Aliases (one per line, optional)</label>
+    <textarea name="aliases" placeholder="www.example.com&#10;api.example.com"></textarea>
+  </div>
+  <div class="field">
+    <label>.env file (optional)</label>
+    <input type="file" name="envfile">
+  </div>
+  <button class="btn" type="submit">Deploy</button>
+</form>
+</div>
+
+{{end}}
