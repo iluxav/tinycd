@@ -120,6 +120,9 @@ func newDeployCmd() *cobra.Command {
 			}
 
 			// docker compose up
+			if err := dc.EnsureNetwork("tcd-proxy"); err != nil {
+				return fmt.Errorf("ensure tcd-proxy network: %w", err)
+			}
 			client := &dc.Client{
 				RootFile: cfg.RootComposeFile(),
 				Project:  "tcd",

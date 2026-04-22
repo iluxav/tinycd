@@ -42,6 +42,10 @@ func newInitCmd() *cobra.Command {
 				return fmt.Errorf("mkdir %s: %w", appsDir, err)
 			}
 
+			if err := dc.EnsureNetwork("tcd-proxy"); err != nil {
+				return fmt.Errorf("create tcd-proxy network: %w", err)
+			}
+
 			// SSH key
 			keyPath := filepath.Join(cfgDir, "id_ed25519")
 			pubPath := keyPath + ".pub"

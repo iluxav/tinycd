@@ -77,3 +77,11 @@ func Verify() error {
 	}
 	return nil
 }
+
+// EnsureNetwork creates a docker network if it doesn't already exist.
+func EnsureNetwork(name string) error {
+	if err := sh.Run(sh.Opts{Quiet: true}, "docker", "network", "inspect", name); err == nil {
+		return nil
+	}
+	return sh.Run(sh.Opts{Quiet: true}, "docker", "network", "create", name)
+}

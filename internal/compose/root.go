@@ -52,7 +52,8 @@ func RenderRootCompose(in RootComposeInput) ([]byte, error) {
 		},
 		"networks": map[string]any{
 			"tcd-proxy": map[string]any{
-				"name": "tcd-proxy",
+				"name":     "tcd-proxy",
+				"external": true,
 			},
 		},
 		"include": []any{}, // populated by tcd deploy
