@@ -35,13 +35,11 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	if err := s.tmpl.ExecuteTemplate(w, "index.html", indexView{
+	s.render(w, "index.html", indexView{
 		User: currentUser(r),
 		Cfg:  cfg,
 		Apps: apps,
-	}); err != nil {
-		http.Error(w, err.Error(), 500)
-	}
+	})
 }
 
 type appView struct {
@@ -67,15 +65,13 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	psText, _ := capturePs(client, state.Service)
 	envRaw, _ := os.ReadFile(state.EnvFile)
 
-	if err := s.tmpl.ExecuteTemplate(w, "app.html", appView{
+	s.render(w, "app.html", appView{
 		User:   currentUser(r),
 		Cfg:    cfg,
 		App:    state,
 		PsText: psText,
 		EnvRaw: string(envRaw),
-	}); err != nil {
-		http.Error(w, err.Error(), 500)
-	}
+	})
 }
 
 // handleLogs streams `docker compose logs -f <service>` as Server-Sent Events.

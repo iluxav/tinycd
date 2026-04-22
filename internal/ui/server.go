@@ -14,16 +14,49 @@ var templatesFS embed.FS
 
 // Server holds parsed templates and request handlers. One instance per tcd ui
 // process. Routes are registered via Handler().
+//
+// Each page is parsed into its own template set alongside base.html. Go's
+// html/template uses a single namespace per set — if multiple pages defined
+// {{define "content"}} within the same set, the last parse would win.
 type Server struct {
-	tmpl *template.Template
+	pages map[string]*template.Template // page name ("index.html") → tree rooted at "base"
 }
 
 func New() (*Server, error) {
-	tmpl, err := template.New("").Funcs(funcMap()).ParseFS(templatesFS, "templates/*.html")
-	if err != nil {
-		return nil, fmt.Errorf("parse templates: %w", err)
+	pages := map[string]*template.Template{}
+	// Pages that extend base.html via block overrides.
+	for _, name := range []string{"index.html", "app.html", "settings.html"} {
+		t, err := template.New(name).Funcs(funcMap()).ParseFS(templatesFS, "templates/base.html", "templates/"+name)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", name, err)
+		}
+		pages[name] = t
 	}
-	return &Server{tmpl: tmpl}, nil
+	// Standalone pages.
+	login, err := template.New("login.html").ParseFS(templatesFS, "templates/login.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse login.html: %w", err)
+	}
+	pages["login.html"] = login
+	return &Server{pages: pages}, nil
+}
+
+// render looks up the page template and executes it with the given data.
+// For pages that extend base.html, it executes the "base" template. For
+// standalone pages (login), it executes the page by name.
+func (s *Server) render(w http.ResponseWriter, page string, data any) {
+	t, ok := s.pages[page]
+	if !ok {
+		http.Error(w, "template not found: "+page, http.StatusInternalServerError)
+		return
+	}
+	entry := "base"
+	if page == "login.html" {
+		entry = "login.html"
+	}
+	if err := t.ExecuteTemplate(w, entry, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // Handler returns the HTTP handler with all routes wired.

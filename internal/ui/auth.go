@@ -109,7 +109,7 @@ type loginView struct {
 
 func (s *Server) handleLoginGET(w http.ResponseWriter, r *http.Request) {
 	next := r.URL.Query().Get("next")
-	_ = s.tmpl.ExecuteTemplate(w, "login.html", loginView{Next: next})
+	s.render(w, "login.html", loginView{Next: next})
 }
 
 func (s *Server) handleLoginPOST(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +131,7 @@ func (s *Server) handleLoginPOST(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := af.Verify(user, pass); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		_ = s.tmpl.ExecuteTemplate(w, "login.html", loginView{Next: next, Error: "invalid username or password"})
+		s.render(w, "login.html", loginView{Next: next, Error: "invalid username or password"})
 		return
 	}
 	cookie, err := af.MakeCookie(user, auth.DefaultSessionTTL)
@@ -150,7 +150,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 // settings page — change password.
 func (s *Server) handleSettingsGET(w http.ResponseWriter, r *http.Request) {
-	_ = s.tmpl.ExecuteTemplate(w, "settings.html", map[string]any{
+	s.render(w, "settings.html", map[string]any{
 		"User": currentUser(r),
 	})
 }
@@ -186,7 +186,7 @@ func (s *Server) handleSettingsPOST(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	_ = s.tmpl.ExecuteTemplate(w, "settings.html", map[string]any{
+	s.render(w, "settings.html", map[string]any{
 		"User":    user,
 		"Success": "password changed",
 	})
@@ -194,7 +194,7 @@ func (s *Server) handleSettingsPOST(w http.ResponseWriter, r *http.Request) {
 
 func renderSettingsError(s *Server, w http.ResponseWriter, r *http.Request, user, msg string) {
 	w.WriteHeader(http.StatusBadRequest)
-	_ = s.tmpl.ExecuteTemplate(w, "settings.html", map[string]any{
+	s.render(w, "settings.html", map[string]any{
 		"User":  user,
 		"Error": msg,
 	})
