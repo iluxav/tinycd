@@ -172,6 +172,77 @@ func AutoAliases(appName string, publicDomains []string) []string {
 	return out
 }
 
+// Rescale changes an app's replica count and applies it without re-running
+// git or rebuilding. Updates state.Scale and runs `docker compose up -d
+// --scale <primary>=N`.
+func Rescale(cfg *config.Config, name string, newScale int) (*config.AppState, error) {
+	if newScale < 1 {
+		return nil, fmt.Errorf("scale must be >= 1")
+	}
+	state, err := config.LoadState(cfg.AppDir(name))
+	if err != nil {
+		return nil, err
+	}
+	if err := dc.EnsureNetwork("tcd-proxy"); err != nil {
+		return nil, err
+	}
+	client := &dc.Client{
+		RootFile: cfg.RootComposeFile(),
+		Project:  "tcd",
+		Env:      []string{"ACME_EMAIL=" + cfg.ACMEEmail},
+	}
+	scales := map[string]int{state.Service: newScale}
+	if err := client.Up(scales); err != nil {
+		return nil, err
+	}
+	state.Scale = newScale
+	if err := config.SaveState(cfg.AppDir(name), state); err != nil {
+		return nil, err
+	}
+	return state, nil
+}
+
+// Redeploy re-runs Deploy for an existing app — pulls latest code at the
+// recorded ref, rebuilds the image, and runs compose up. Preserves the app's
+// existing .env, aliases, scale, port, and primary service.
+func Redeploy(cfg *config.Config, name string) (*config.AppState, error) {
+	state, err := config.LoadState(cfg.AppDir(name))
+	if err != nil {
+		return nil, err
+	}
+	// Filter out auto-derived aliases; Deploy will regenerate them from cfg.PublicDomains.
+	manual := manualAliases(name, state.Aliases, cfg.PublicDomains)
+	return Deploy(cfg, Options{
+		Repo:    state.Repo,
+		Name:    state.Name,
+		Ref:     state.Ref,
+		Port:    state.Port,
+		Scale:   state.Scale,
+		Service: state.Service,
+		Aliases: manual,
+		// EnvFile left empty so existing .env is preserved.
+	})
+}
+
+// manualAliases returns the subset of allAliases that are NOT auto-derived
+// (<app>.<publicDomain>), preserving only the ones explicitly supplied by
+// the user at deploy time.
+func manualAliases(appName string, allAliases, publicDomains []string) []string {
+	auto := map[string]struct{}{}
+	for _, pd := range publicDomains {
+		if pd != "" {
+			auto[appName+"."+pd] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(allAliases))
+	for _, a := range allAliases {
+		if _, isAuto := auto[a]; !isAuto {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
 // Remove tears down an app: drops the root include entry, runs compose up to
 // reconcile, and optionally purges its state directory.
 func Remove(cfg *config.Config, name string, purge bool) error {

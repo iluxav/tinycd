@@ -79,6 +79,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /apps/{name}/stop", s.handleStop)
 	mux.HandleFunc("POST /apps/{name}/rm", s.handleRm)
 	mux.HandleFunc("POST /apps/{name}/env", s.handleEnvUpload)
+	mux.HandleFunc("POST /apps/{name}/redeploy", s.handleRedeploy)
+	mux.HandleFunc("POST /apps/{name}/scale", s.handleScale)
 	mux.HandleFunc("POST /deploy", s.handleDeploy)
 	mux.HandleFunc("GET /settings", s.handleSettingsGET)
 	mux.HandleFunc("POST /settings", s.handleSettingsPOST)

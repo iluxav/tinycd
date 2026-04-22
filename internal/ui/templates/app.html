@@ -24,9 +24,19 @@
 </div>
 
 <div class="card">
-<div class="row">
+<div class="row" style="gap: 16px;">
+  <form class="inline" method="POST" action="/apps/{{.App.Name}}/redeploy"
+        onsubmit="return confirm('Pull latest and rebuild {{.App.Name}}?');">
+    <button class="btn" type="submit">Redeploy (pull latest)</button>
+  </form>
+  <form class="inline" method="POST" action="/apps/{{.App.Name}}/scale" style="display: flex; gap: 6px; align-items: center;">
+    <label style="margin: 0;">Scale</label>
+    <input type="number" name="scale" value="{{.App.Scale}}" min="1" style="width: 70px;">
+    <button class="btn" type="submit">Apply</button>
+  </form>
   <form class="inline" method="POST" action="/apps/{{.App.Name}}/restart"><button class="btn" type="submit">Restart</button></form>
   <form class="inline" method="POST" action="/apps/{{.App.Name}}/stop"><button class="btn" type="submit">Stop</button></form>
+  <span style="margin-left: auto;"></span>
   <form class="inline" method="POST" action="/apps/{{.App.Name}}/rm" onsubmit="return confirm('Remove {{.App.Name}}? Containers will be torn down.');">
     <button class="btn danger" type="submit">Remove</button>
   </form>
@@ -55,22 +65,43 @@
 </form>
 </div>
 
-<h2>Logs <span style="font-weight: normal; color: var(--muted); text-transform: none; letter-spacing: 0;">(live)</span></h2>
+<h2 style="display: flex; align-items: center; gap: 12px;">
+  Logs
+  <span style="font-weight: normal; color: var(--muted); text-transform: none; letter-spacing: 0;">(live)</span>
+  {{if gt (len .Services) 1}}
+  <select id="svc-picker" style="margin-left: auto; max-width: 220px;">
+    {{range .Services}}
+      <option value="{{.}}"{{if eq . $.App.Service}} selected{{end}}>{{.}}</option>
+    {{end}}
+  </select>
+  {{end}}
+</h2>
 <pre class="log" id="logs"></pre>
 
 <script>
 (function() {
   const box = document.getElementById('logs');
-  const es = new EventSource('/apps/{{.App.Name}}/logs?tail=200');
-  es.onmessage = (e) => {
-    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-    box.textContent += e.data + '\n';
-    if (atBottom) box.scrollTop = box.scrollHeight;
-  };
-  es.onerror = () => {
-    box.textContent += '\n[connection lost]\n';
-  };
-  window.addEventListener('beforeunload', () => es.close());
+  const picker = document.getElementById('svc-picker');
+  let es = null;
+
+  function connect(service) {
+    if (es) es.close();
+    box.textContent = '';
+    const qs = service ? ('&service=' + encodeURIComponent(service)) : '';
+    es = new EventSource('/apps/{{.App.Name}}/logs?tail=200' + qs);
+    es.onmessage = (e) => {
+      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+      box.textContent += e.data + '\n';
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    };
+    es.onerror = () => {
+      box.textContent += '\n[connection lost]\n';
+    };
+  }
+
+  connect(picker ? picker.value : '');
+  if (picker) picker.addEventListener('change', () => connect(picker.value));
+  window.addEventListener('beforeunload', () => { if (es) es.close(); });
 })();
 </script>
 

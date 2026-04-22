@@ -43,11 +43,12 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 type appView struct {
-	User   string
-	Cfg    *config.Config
-	App    *config.AppState
-	PsText string
-	EnvRaw string
+	User     string
+	Cfg      *config.Config
+	App      *config.AppState
+	PsText   string
+	EnvRaw   string
+	Services []string // all services declared in the app's compose file
 }
 
 func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
@@ -65,12 +66,19 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	psText, _ := capturePs(client, state.Service)
 	envRaw, _ := os.ReadFile(state.EnvFile)
 
+	// List services defined in the app's compose file (for the logs picker).
+	var services []string
+	if parsed, err := compose.ParseComposeFile(state.ComposeFile); err == nil {
+		services = parsed.Order()
+	}
+
 	s.render(w, "app.html", appView{
-		User:   currentUser(r),
-		Cfg:    cfg,
-		App:    state,
-		PsText: psText,
-		EnvRaw: string(envRaw),
+		User:     currentUser(r),
+		Cfg:      cfg,
+		App:      state,
+		PsText:   psText,
+		EnvRaw:   string(envRaw),
+		Services: services,
 	})
 }
 
@@ -100,7 +108,27 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	if tail == "" {
 		tail = "200"
 	}
-	args := []string{"compose", "-f", cfg.RootComposeFile(), "-p", "tcd", "logs", "--tail", tail, "-f", "--no-color", state.Service}
+	// Resolve which service to tail. Default: the app's primary. Override
+	// via ?service=, validated against the app's compose file so callers
+	// can't tail arbitrary containers on the host.
+	svc := state.Service
+	if req := r.URL.Query().Get("service"); req != "" {
+		if parsed, err := compose.ParseComposeFile(state.ComposeFile); err == nil {
+			allowed := false
+			for _, name := range parsed.Order() {
+				if name == req {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				http.Error(w, "service not in this app's compose", http.StatusBadRequest)
+				return
+			}
+			svc = req
+		}
+	}
+	args := []string{"compose", "-f", cfg.RootComposeFile(), "-p", "tcd", "logs", "--tail", tail, "-f", "--no-color", svc}
 	cmd := exec.CommandContext(r.Context(), "docker", args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -132,6 +160,41 @@ func sseEscape(s string) string {
 	// SSE: each data line must not contain raw newlines. Our scanner splits on
 	// lines already, so just strip carriage returns from DOS-flavored output.
 	return strings.ReplaceAll(s, "\r", "")
+}
+
+func (s *Server) handleRedeploy(w http.ResponseWriter, r *http.Request) {
+	cfg, ok := s.loadCfg(w)
+	if !ok {
+		return
+	}
+	name := r.PathValue("name")
+	if _, err := deploy.Redeploy(cfg, name); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectBack(w, r, "/apps/"+name)
+}
+
+func (s *Server) handleScale(w http.ResponseWriter, r *http.Request) {
+	cfg, ok := s.loadCfg(w)
+	if !ok {
+		return
+	}
+	name := r.PathValue("name")
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	n, err := strconv.Atoi(r.FormValue("scale"))
+	if err != nil || n < 1 {
+		http.Error(w, "scale must be a positive integer", http.StatusBadRequest)
+		return
+	}
+	if _, err := deploy.Rescale(cfg, name, n); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectBack(w, r, "/apps/"+name)
 }
 
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
@@ -247,8 +310,18 @@ func (s *Server) handleDeploy(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// Optional env file upload → write to temp path and pass as EnvFile.
-	if file, _, err := r.FormFile("envfile"); err == nil {
+	// Env: textarea wins over file upload.
+	if raw := r.FormValue("envraw"); strings.TrimSpace(raw) != "" {
+		tmp, err := os.CreateTemp("", "tcd-env-*")
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		tmp.WriteString(raw)
+		tmp.Close()
+		defer os.Remove(tmp.Name())
+		opts.EnvFile = tmp.Name()
+	} else if file, _, err := r.FormFile("envfile"); err == nil {
 		defer file.Close()
 		tmp, err := os.CreateTemp("", "tcd-env-*")
 		if err != nil {

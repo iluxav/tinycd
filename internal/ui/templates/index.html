@@ -65,8 +65,13 @@
     <textarea name="aliases" placeholder="www.example.com&#10;api.example.com"></textarea>
   </div>
   <div class="field">
-    <label>.env file (optional)</label>
+    <label>Env variables (optional — paste KEY=value per line)</label>
+    <textarea name="envraw" placeholder="DATABASE_URL=postgres://...&#10;LOG_LEVEL=info"></textarea>
+  </div>
+  <div class="field">
+    <label>…or upload a .env file</label>
     <input type="file" name="envfile">
+    <span style="color: var(--muted); font-size: 12px;">Textarea takes precedence if both are provided.</span>
   </div>
   <button class="btn" type="submit">Deploy</button>
 </form>
