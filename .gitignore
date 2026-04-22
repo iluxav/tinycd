@@ -10,7 +10,7 @@ docs/
 /vendor/
 coverage.txt
 coverage.html
-
+.claude
 # Editors / OS
 .DS_Store
 .idea/
