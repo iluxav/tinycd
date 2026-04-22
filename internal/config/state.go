@@ -9,18 +9,19 @@ import (
 
 // AppState tracks everything tcd knows about a deployed app.
 type AppState struct {
-	Name        string `json:"name"`
-	Repo        string `json:"repo"`
-	RepoURL     string `json:"repo_url"`
-	Ref         string `json:"ref"`
-	Commit      string `json:"commit"`
-	Service     string `json:"service"`
-	Port        int    `json:"port"`
-	Scale       int    `json:"scale"`
-	URL         string `json:"url"`
-	EnvFile     string `json:"env_file,omitempty"`
-	ComposeFile string `json:"compose_file"`
-	OverrideFile string `json:"override_file"`
+	Name         string   `json:"name"`
+	Repo         string   `json:"repo"`
+	RepoURL      string   `json:"repo_url"`
+	Ref          string   `json:"ref"`
+	Commit       string   `json:"commit"`
+	Service      string   `json:"service"`
+	Port         int      `json:"port"`
+	Scale        int      `json:"scale"`
+	URL          string   `json:"url"`
+	Aliases      []string `json:"aliases,omitempty"`
+	EnvFile      string   `json:"env_file,omitempty"`
+	ComposeFile  string   `json:"compose_file"`
+	OverrideFile string   `json:"override_file"`
 }
 
 func StatePath(appDir string) string {

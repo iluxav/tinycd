@@ -161,6 +161,9 @@ func newStatusCmd() *cobra.Command {
 			fmt.Printf("ref:          %s\n", s.Ref)
 			fmt.Printf("commit:       %s\n", s.Commit)
 			fmt.Printf("url:          %s\n", s.URL)
+			for _, a := range s.Aliases {
+				fmt.Printf("alias:        %s\n", a)
+			}
 			fmt.Printf("port:         %d\n", s.Port)
 			fmt.Printf("scale:        %d\n", s.Scale)
 			fmt.Printf("service:      %s\n", s.Service)

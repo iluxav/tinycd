@@ -22,6 +22,7 @@ func newDeployCmd() *cobra.Command {
 		scale   int
 		service string
 		envFile string
+		aliases []string
 	)
 	cmd := &cobra.Command{
 		Use:   "deploy <repo>",
@@ -102,6 +103,7 @@ func newDeployCmd() *cobra.Command {
 				EnvFilePath:  envRel,
 				NetworkName:  "tcd-proxy",
 				CertResolver: certResolver,
+				Aliases:      aliases,
 			}, overridePath); err != nil {
 				return err
 			}
@@ -147,6 +149,7 @@ func newDeployCmd() *cobra.Command {
 				Port:         port,
 				Scale:        scale,
 				URL:          fmt.Sprintf("http://%s.%s", appName, cfg.Domain),
+				Aliases:      aliases,
 				EnvFile:      envTarget,
 				ComposeFile:  composePath,
 				OverrideFile: overridePath,
@@ -168,6 +171,7 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().IntVar(&scale, "scale", 1, "number of replicas")
 	cmd.Flags().StringVar(&service, "service", "", "primary service name (overrides auto-detection)")
 	cmd.Flags().StringVar(&envFile, "env-file", "", "path to .env file to install for this app")
+	cmd.Flags().StringArrayVar(&aliases, "alias", nil, "additional hostname to route to this app (repeatable, e.g. --alias hd.etunl.com)")
 	return cmd
 }
 

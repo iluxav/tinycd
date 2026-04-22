@@ -45,6 +45,50 @@ func TestRenderOverride_WithEnvAndTLS(t *testing.T) {
 	}
 }
 
+func TestRenderOverride_WithAliases(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "override.yml")
+	err := RenderOverride(OverrideInput{
+		AppName:     "app1",
+		PrimarySvc:  "web",
+		Domain:      "example.com",
+		Port:        3000,
+		NetworkName: "tcd-proxy",
+		Aliases:     []string{"hd.etunl.com", "foo.bar.test"},
+	}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(out)
+	s := string(data)
+	for _, want := range []string{
+		"Host(`app1.example.com`)",
+		"Host(`hd.etunl.com`)",
+		"Host(`foo.bar.test`)",
+		"||",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("override output missing %q\n---\n%s", want, s)
+		}
+	}
+}
+
+func TestBuildHostRule(t *testing.T) {
+	cases := []struct {
+		in   []string
+		want string
+	}{
+		{[]string{"a"}, "Host(`a`)"},
+		{[]string{"a", "b"}, "Host(`a`) || Host(`b`)"},
+		{[]string{"a", "", "b"}, "Host(`a`) || Host(`b`)"},
+	}
+	for _, c := range cases {
+		if got := buildHostRule(c.in); got != c.want {
+			t.Errorf("buildHostRule(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
 func TestRenderOverride_NoTLS_NoEnv(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "override.yml")
