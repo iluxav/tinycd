@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/iluxav/tinycd/internal/auth"
+	"github.com/iluxav/tinycd/internal/sh"
 	"github.com/iluxav/tinycd/internal/ui"
 )
 
@@ -27,6 +28,11 @@ func newUICmd() *cobra.Command {
 					return fmt.Errorf("auth not configured — run `tcd admin set-password admin` first")
 				}
 				return err
+			}
+			// Startup probe: if this process can't reach docker, fail loudly now
+			// with actionable guidance instead of breaking on the first user action.
+			if err := sh.Run(sh.Opts{Quiet: true}, "docker", "info"); err != nil {
+				return fmt.Errorf("cannot reach docker daemon: %w\n\nhint: this process needs access to the docker socket. If you recently ran `usermod -aG docker`, systemd --user needs a fresh session: `sudo systemctl restart user@$(id -u).service` (or log out fully and back in)", err)
 			}
 			srv, err := ui.New()
 			if err != nil {

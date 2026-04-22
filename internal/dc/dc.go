@@ -80,8 +80,18 @@ func Verify() error {
 
 // EnsureNetwork creates a docker network if it doesn't already exist.
 func EnsureNetwork(name string) error {
+	// Fast path: inspect succeeds → already exists and we have docker access.
 	if err := sh.Run(sh.Opts{Quiet: true}, "docker", "network", "inspect", name); err == nil {
 		return nil
 	}
-	return sh.Run(sh.Opts{Quiet: true}, "docker", "network", "create", name)
+	// Try to create. On failure, check whether docker itself is reachable; if
+	// not, the most common cause is group membership not applied to this
+	// process (systemd --user started before `usermod -aG docker`).
+	if err := sh.Run(sh.Opts{Quiet: true}, "docker", "network", "create", name); err != nil {
+		if probeErr := sh.Run(sh.Opts{Quiet: true}, "docker", "info"); probeErr != nil {
+			return fmt.Errorf("%w\n\nhint: this process can't talk to the docker daemon. If you recently added your user to the `docker` group, systemd --user needs a fresh session: run `sudo systemctl restart user@$(id -u).service` or log out fully and back in", probeErr)
+		}
+		return err
+	}
+	return nil
 }
