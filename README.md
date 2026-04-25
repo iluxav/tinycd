@@ -2,7 +2,6 @@
 
 A tiny Go CLI that deploys private GitHub repos to a single host with Docker Compose and a shared Traefik reverse proxy.
 
-See [CLAUDE.md](CLAUDE.md) for the product spec and [docs/plans/2026-04-22-tcd-design.md](docs/plans/2026-04-22-tcd-design.md) for the design.
 
 ## Install
 
