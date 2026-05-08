@@ -67,8 +67,8 @@ func collectAutoVolumes(cfg *config.Config, appName string, parsed *compose.Pars
 			if err := os.MkdirAll(hostPath, 0o755); err != nil {
 				return nil, nil, fmt.Errorf("mkdir %s: %w", hostPath, err)
 			}
-			if err := os.Chown(hostPath, uid, gid); err != nil {
-				fmt.Fprintf(os.Stderr, "warn: chown %s to %d:%d: %v\n", hostPath, uid, gid, err)
+			if err := ensureContainerWritable(hostPath, uid, gid); err != nil {
+				fmt.Fprintf(os.Stderr, "warn: %s\n", err)
 			}
 			auto = append(auto, compose.AutoVolume{
 				Service:   svcName,
@@ -83,6 +83,29 @@ func collectAutoVolumes(cfg *config.Config, appName string, parsed *compose.Pars
 		}
 	}
 	return auto, mounts, nil
+}
+
+// ensureContainerWritable makes hostPath writable from inside the container,
+// regardless of whether tcd itself runs as root.
+//
+//   - When tcd is root (the common systemd-deployed case): chown to the image's
+//     runtime UID:GID. Container process owns its data dir, no extra perms.
+//   - When tcd is non-root (e.g. user ran `tcd deploy` on macOS or a personal
+//     linux box): non-root cannot chown to a foreign UID, so fall back to
+//     chmod 0o777. The container user can now write; the cost is that any
+//     local user on the host can also read/write the data, which is fine on a
+//     single-user box and the only option short of running tcd as root.
+func ensureContainerWritable(hostPath string, uid, gid int) error {
+	if os.Geteuid() == 0 {
+		if err := os.Chown(hostPath, uid, gid); err != nil {
+			return fmt.Errorf("chown %s to %d:%d: %w", hostPath, uid, gid, err)
+		}
+		return nil
+	}
+	if err := os.Chmod(hostPath, 0o777); err != nil {
+		return fmt.Errorf("chmod %s 0o777: %w", hostPath, err)
+	}
+	return nil
 }
 
 // filterAutoVolumePaths returns the subset of declared VOLUME paths that the
