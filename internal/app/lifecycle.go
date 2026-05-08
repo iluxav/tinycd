@@ -189,6 +189,9 @@ func newStatusCmd() *cobra.Command {
 			fmt.Printf("compose:      %s\n", s.ComposeFile)
 			fmt.Printf("override:     %s\n", s.OverrideFile)
 			fmt.Printf("repo path:    %s\n", filepath.Join(cfg.AppDir(s.Name), "repo"))
+			for _, v := range s.VolumeMounts {
+				fmt.Printf("volume:       %s:%s → %s\n", v.Service, v.MountPath, v.HostPath)
+			}
 			fmt.Println()
 			return newClient(cfg).PsTable(s.Service)
 		},

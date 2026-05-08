@@ -1,7 +1,10 @@
 package dc
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/iluxav/tinycd/internal/sh"
 )
@@ -11,6 +14,14 @@ type Client struct {
 	RootFile string
 	Project  string
 	Env      []string
+
+	// userCache memoizes ResolveUser results per (image, user) so we don't
+	// pay the docker-run cost twice in one deploy.
+	userCache map[string]userIDs
+}
+
+type userIDs struct {
+	UID, GID int
 }
 
 func (c *Client) base() []string {
@@ -25,13 +36,134 @@ func (c *Client) capture(args ...string) (string, error) {
 	return sh.Capture(sh.Opts{Env: c.Env}, "docker", append(c.base(), args...)...)
 }
 
-// Up runs `up -d --build` with optional per-service --scale values.
+// Up runs `up -d --remove-orphans` with optional per-service --scale values.
+// Build() and Pull() should be called first; Up no longer rebuilds.
 func (c *Client) Up(scales map[string]int) error {
-	args := []string{"up", "-d", "--build", "--remove-orphans"}
+	args := []string{"up", "-d", "--remove-orphans"}
 	for svc, n := range scales {
 		args = append(args, "--scale", fmt.Sprintf("%s=%d", svc, n))
 	}
 	return c.run(args...)
+}
+
+// Build runs `docker compose build` for all services that have a build: stanza.
+func (c *Client) Build() error {
+	return c.run("build")
+}
+
+// Pull runs `docker compose pull` to fetch all image: refs. --ignore-pull-failures
+// keeps the call from erroring when a service has only build: (compose tries
+// to pull anyway and treats the failure as fatal otherwise).
+func (c *Client) Pull() error {
+	return c.run("pull", "--ignore-pull-failures")
+}
+
+// ServiceImages returns the resolved image ref per service from `docker compose
+// config --format json`. Works for both image:-only services and build:
+// services (compose synthesizes a name like <project>-<service>).
+func (c *Client) ServiceImages() (map[string]string, error) {
+	out, err := c.capture("config", "--format", "json")
+	if err != nil {
+		return nil, fmt.Errorf("docker compose config: %w", err)
+	}
+	var doc struct {
+		Services map[string]struct {
+			Image string `json:"image"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		return nil, fmt.Errorf("parse compose config: %w", err)
+	}
+	images := make(map[string]string, len(doc.Services))
+	for name, svc := range doc.Services {
+		if svc.Image != "" {
+			images[name] = svc.Image
+		}
+	}
+	return images, nil
+}
+
+// InspectImage returns the in-container paths declared by VOLUME directives
+// and the image's runtime User string (may be empty, numeric, or named).
+func (c *Client) InspectImage(image string) (volumes []string, user string, err error) {
+	out, err := sh.Capture(sh.Opts{Env: c.Env}, "docker", "image", "inspect", image, "--format", "{{json .Config}}")
+	if err != nil {
+		return nil, "", fmt.Errorf("docker image inspect %s: %w", image, err)
+	}
+	var cfg struct {
+		Volumes map[string]struct{} `json:"Volumes"`
+		User    string              `json:"User"`
+	}
+	if err := json.Unmarshal([]byte(out), &cfg); err != nil {
+		return nil, "", fmt.Errorf("parse image config %s: %w", image, err)
+	}
+	for v := range cfg.Volumes {
+		volumes = append(volumes, v)
+	}
+	return volumes, cfg.User, nil
+}
+
+// ResolveUser maps an image's User string to numeric UID:GID. Empty → 0:0.
+// Numeric strings ("1001" or "1001:1001") parse directly. Named users
+// ("nextjs:nodejs") require running the image to query /etc/passwd via id(1).
+// Results are cached for the lifetime of the Client.
+func (c *Client) ResolveUser(image, user string) (uid, gid int, err error) {
+	if user == "" {
+		return 0, 0, nil
+	}
+	if c.userCache == nil {
+		c.userCache = map[string]userIDs{}
+	}
+	key := image + "\x00" + user
+	if cached, ok := c.userCache[key]; ok {
+		return cached.UID, cached.GID, nil
+	}
+
+	if u, g, ok := parseNumericUser(user); ok {
+		c.userCache[key] = userIDs{u, g}
+		return u, g, nil
+	}
+
+	// Named user: run a throwaway container to look up the numeric IDs.
+	out, err := sh.Capture(sh.Opts{Env: c.Env}, "docker", "run", "--rm", "--entrypoint", "sh", image, "-c", "id -u "+shellEscape(strings.SplitN(user, ":", 2)[0])+"; id -g "+shellEscape(strings.SplitN(user, ":", 2)[0]))
+	if err != nil {
+		return 0, 0, fmt.Errorf("resolve user %q in image %s: %w", user, image, err)
+	}
+	lines := strings.Fields(out)
+	if len(lines) < 2 {
+		return 0, 0, fmt.Errorf("unexpected id output for user %q in image %s: %q", user, image, out)
+	}
+	uid, err = strconv.Atoi(lines[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse uid %q: %w", lines[0], err)
+	}
+	gid, err = strconv.Atoi(lines[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse gid %q: %w", lines[1], err)
+	}
+	c.userCache[key] = userIDs{uid, gid}
+	return uid, gid, nil
+}
+
+func parseNumericUser(s string) (uid, gid int, ok bool) {
+	parts := strings.SplitN(s, ":", 2)
+	u, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, false
+	}
+	g := u
+	if len(parts) == 2 {
+		g, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return 0, 0, false
+		}
+	}
+	return u, g, true
+}
+
+// shellEscape produces a single-quoted string safe to embed in `sh -c`.
+func shellEscape(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func (c *Client) Restart(services ...string) error {

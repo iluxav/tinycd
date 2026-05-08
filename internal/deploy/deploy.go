@@ -95,7 +95,7 @@ func Deploy(cfg *config.Config, opts Options) (*config.AppState, error) {
 	effectiveAliases := append([]string(nil), AutoAliases(appName, cfg.PublicDomains)...)
 	effectiveAliases = append(effectiveAliases, opts.Aliases...)
 
-	if err := compose.RenderOverride(compose.OverrideInput{
+	overrideInput := compose.OverrideInput{
 		AppName:      appName,
 		PrimarySvc:   primary,
 		Domain:       cfg.Domain,
@@ -104,7 +104,11 @@ func Deploy(cfg *config.Config, opts Options) (*config.AppState, error) {
 		NetworkName:  "tcd-proxy",
 		CertResolver: certResolver,
 		Aliases:      effectiveAliases,
-	}, overridePath); err != nil {
+	}
+
+	// First pass: render override without auto-volumes so the include is valid
+	// and `docker compose build/pull` below can resolve.
+	if err := compose.RenderOverride(overrideInput, overridePath); err != nil {
 		return nil, err
 	}
 
@@ -128,6 +132,26 @@ func Deploy(cfg *config.Config, opts Options) (*config.AppState, error) {
 		Project:  "tcd",
 		Env:      []string{"ACME_EMAIL=" + cfg.ACMEEmail},
 	}
+
+	// Build/pull so images exist locally for inspection.
+	if err := client.Build(); err != nil {
+		return nil, err
+	}
+	if err := client.Pull(); err != nil {
+		return nil, err
+	}
+
+	// Inspect each service's image, derive auto-volumes (skipping anything the
+	// user has already mapped), prepare host dirs, re-render the override.
+	autoVols, mounts, err := collectAutoVolumes(cfg, appName, parsed, client)
+	if err != nil {
+		return nil, err
+	}
+	overrideInput.AutoVolumes = autoVols
+	if err := compose.RenderOverride(overrideInput, overridePath); err != nil {
+		return nil, err
+	}
+
 	scales := map[string]int{}
 	if opts.Scale > 1 {
 		scales[primary] = opts.Scale
@@ -150,6 +174,7 @@ func Deploy(cfg *config.Config, opts Options) (*config.AppState, error) {
 		EnvFile:      envTarget,
 		ComposeFile:  composePath,
 		OverrideFile: overridePath,
+		VolumeMounts: mounts,
 	}
 	if cfg.ACMEEmail != "" {
 		state.URL = fmt.Sprintf("https://%s.%s", appName, cfg.Domain)

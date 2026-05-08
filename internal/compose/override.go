@@ -14,10 +14,19 @@ type OverrideInput struct {
 	PrimarySvc   string
 	Domain       string
 	Port         int
-	EnvFilePath  string   // absolute or relative-to-override path; empty if none
-	NetworkName  string   // e.g. "tcd-proxy"
-	CertResolver string   // e.g. "le" — empty disables TLS router
-	Aliases      []string // additional hostnames to match, e.g. "hd.etunl.com"
+	EnvFilePath  string       // absolute or relative-to-override path; empty if none
+	NetworkName  string       // e.g. "tcd-proxy"
+	CertResolver string       // e.g. "le" — empty disables TLS router
+	Aliases      []string     // additional hostnames to match, e.g. "hd.etunl.com"
+	AutoVolumes  []AutoVolume // host-backed mounts derived from image VOLUME directives
+}
+
+// AutoVolume is a bind mount tcd attaches to <Service> at <MountPath>, backed
+// by <HostPath> on the host. HostPath should be absolute.
+type AutoVolume struct {
+	Service   string
+	HostPath  string
+	MountPath string
 }
 
 // RenderOverride writes apps/<app>/override.yml merging Traefik labels, network, and env_file
@@ -45,10 +54,29 @@ func RenderOverride(in OverrideInput, outPath string) error {
 		svc["env_file"] = []string{in.EnvFilePath}
 	}
 
+	services := map[string]any{
+		in.PrimarySvc: svc,
+	}
+
+	// Group auto-volumes by service. The primary service gets its volumes
+	// appended to the existing entry; other services get a fresh entry that
+	// compose will merge with the user's own service definition.
+	byService := map[string][]string{}
+	for _, v := range in.AutoVolumes {
+		byService[v.Service] = append(byService[v.Service], v.HostPath+":"+v.MountPath)
+	}
+	for svcName, mounts := range byService {
+		if svcName == in.PrimarySvc {
+			svc["volumes"] = mounts
+			continue
+		}
+		services[svcName] = map[string]any{
+			"volumes": mounts,
+		}
+	}
+
 	doc := map[string]any{
-		"services": map[string]any{
-			in.PrimarySvc: svc,
-		},
+		"services": services,
 		"networks": map[string]any{
 			in.NetworkName: map[string]any{
 				"external": true,

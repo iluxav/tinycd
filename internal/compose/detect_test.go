@@ -109,6 +109,40 @@ services:
 	}
 }
 
+func TestExistingVolumeTargets_ShortAndLong(t *testing.T) {
+	yml := []byte(`
+services:
+  web:
+    image: foo
+    volumes:
+      - ./data:/data
+      - cachevol:/cache:ro
+      - /abs/host:/host
+      - type: bind
+        source: ./logs
+        target: /var/log/app
+      - /anonymous-only
+  bare:
+    image: bar
+`)
+	p, err := ParseCompose(yml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := ExistingVolumeTargets(p.Services["web"])
+	for _, want := range []string{"/data", "/cache", "/host", "/var/log/app", "/anonymous-only"} {
+		if !got[want] {
+			t.Errorf("expected target %q to be detected, got %v", want, got)
+		}
+	}
+	if len(got) != 5 {
+		t.Errorf("expected 5 targets, got %d: %v", len(got), got)
+	}
+	if bare := ExistingVolumeTargets(p.Services["bare"]); len(bare) != 0 {
+		t.Errorf("expected no targets for bare service, got %v", bare)
+	}
+}
+
 func TestDetectComposeFile(t *testing.T) {
 	dir := t.TempDir()
 	if _, ok := DetectComposeFile(dir); ok {

@@ -89,6 +89,36 @@ func TestBuildHostRule(t *testing.T) {
 	}
 }
 
+func TestRenderOverride_AutoVolumes(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "override.yml")
+	err := RenderOverride(OverrideInput{
+		AppName:     "myapp",
+		PrimarySvc:  "web",
+		Domain:      "example.com",
+		Port:        3000,
+		NetworkName: "tcd-proxy",
+		AutoVolumes: []AutoVolume{
+			{Service: "web", HostPath: "/var/lib/tcd/myapp/volumes/web/data", MountPath: "/data"},
+			{Service: "db", HostPath: "/var/lib/tcd/myapp/volumes/db/var/lib/postgresql/data", MountPath: "/var/lib/postgresql/data"},
+		},
+	}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(out)
+	s := string(data)
+	for _, want := range []string{
+		"/var/lib/tcd/myapp/volumes/web/data:/data",
+		"/var/lib/tcd/myapp/volumes/db/var/lib/postgresql/data:/var/lib/postgresql/data",
+		"db:", // non-primary service entry must appear
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("override output missing %q\n---\n%s", want, s)
+		}
+	}
+}
+
 func TestRenderOverride_NoTLS_NoEnv(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "override.yml")

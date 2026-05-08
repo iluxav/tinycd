@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -124,6 +125,39 @@ func labelHasPrimary(labels any) bool {
 		}
 	}
 	return false
+}
+
+// ExistingVolumeTargets returns the set of in-container mount paths the user
+// has already explicitly mapped on this service. Supports both short syntax
+// ("source:target[:mode]") and long syntax (`{type, source, target}`).
+func ExistingVolumeTargets(spec ServiceSpec) map[string]bool {
+	out := map[string]bool{}
+	raw, ok := spec.Raw["volumes"]
+	if !ok {
+		return out
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		return out
+	}
+	for _, item := range list {
+		switch v := item.(type) {
+		case string:
+			// short form: SOURCE:TARGET[:MODE]  or  TARGET (anonymous)
+			parts := strings.Split(v, ":")
+			switch len(parts) {
+			case 1:
+				out[parts[0]] = true
+			default:
+				out[parts[1]] = true
+			}
+		case map[string]any:
+			if t, ok := v["target"].(string); ok && t != "" {
+				out[t] = true
+			}
+		}
+	}
+	return out
 }
 
 func truthy(v any) bool {
