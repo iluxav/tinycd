@@ -59,25 +59,37 @@ func (c *Client) Pull() error {
 }
 
 // ServiceImages returns the resolved image ref per service from `docker compose
-// config --format json`. Works for both image:-only services and build:
-// services (compose synthesizes a name like <project>-<service>).
+// config --format json`. Works for both image:-only services and build-only
+// services (compose v2 tags those as <project>-<service>:latest after Build()).
 func (c *Client) ServiceImages() (map[string]string, error) {
 	out, err := c.capture("config", "--format", "json")
 	if err != nil {
 		return nil, fmt.Errorf("docker compose config: %w", err)
 	}
+	return parseServiceImages([]byte(out), c.Project)
+}
+
+// parseServiceImages decodes the JSON from `docker compose config` and yields
+// one image ref per service. For services with `build:` and no explicit
+// `image:`, compose v2 builds and tags `<project>-<service>:latest` — we
+// synthesize that name here so callers can `docker image inspect` it.
+func parseServiceImages(jsonBytes []byte, project string) (map[string]string, error) {
 	var doc struct {
 		Services map[string]struct {
 			Image string `json:"image"`
+			Build any    `json:"build"`
 		} `json:"services"`
 	}
-	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+	if err := json.Unmarshal(jsonBytes, &doc); err != nil {
 		return nil, fmt.Errorf("parse compose config: %w", err)
 	}
 	images := make(map[string]string, len(doc.Services))
 	for name, svc := range doc.Services {
-		if svc.Image != "" {
+		switch {
+		case svc.Image != "":
 			images[name] = svc.Image
+		case svc.Build != nil:
+			images[name] = fmt.Sprintf("%s-%s:latest", project, name)
 		}
 	}
 	return images, nil
