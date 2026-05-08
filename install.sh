@@ -2,10 +2,11 @@
 # tcd installer — curl -fsSL https://raw.githubusercontent.com/iluxav/tinycd/main/install.sh | bash
 #
 # Environment variables:
-#   TCD_VERSION  — tag to install (default: latest)
-#   TCD_REPO     — GitHub repo (default: iluxav/tinycd)
-#   PREFIX       — install prefix (default: /usr/local)
-#   TCD_USER     — if set to 1, install to ~/.local/bin instead
+#   TCD_VERSION             — tag to install (default: latest)
+#   TCD_REPO                — GitHub repo (default: iluxav/tinycd)
+#   PREFIX                  — install prefix (default: /usr/local)
+#   TCD_USER                — if set to 1, install to ~/.local/bin instead
+#   TCD_SKIP_DOCKER_GROUP   — if 1, skip the docker-group bootstrap on Linux
 
 set -euo pipefail
 
@@ -100,3 +101,42 @@ case ":$PATH:" in
   *":$BINDIR:"*) ;;
   *) echo "tcd-install: note: $BINDIR is not in PATH" ;;
 esac
+
+# ----------------------------------------------------------------------------
+# Linux: ensure the invoking user can talk to the docker daemon. tcd talks to
+# /var/run/docker.sock for everything; without docker-group membership every
+# `tcd init` and `tcd deploy` fails with "permission denied". We add the user
+# to the group here so they only have to log out once, after install.
+# ----------------------------------------------------------------------------
+ensure_docker_group() {
+  [ "$os" = "linux" ] || return 0
+  case "${TCD_SKIP_DOCKER_GROUP:-0}" in 1|true|yes) return 0 ;; esac
+  command -v docker >/dev/null 2>&1 || {
+    echo "tcd-install: docker not found — install docker before running 'tcd init'"
+    return 0
+  }
+  # Resolve the real invoking user even when this script runs under sudo.
+  local target="${SUDO_USER:-${USER:-$(id -un)}}"
+  if id -nG "$target" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    echo "tcd-install: user '$target' is already in the docker group"
+    return 0
+  fi
+  if ! getent group docker >/dev/null 2>&1; then
+    echo "tcd-install: 'docker' group does not exist — skipping (is docker really installed?)"
+    return 0
+  fi
+  command -v usermod >/dev/null 2>&1 || {
+    echo "tcd-install: usermod not available — add '$target' to the docker group manually"
+    return 0
+  }
+  echo "tcd-install: adding '$target' to the docker group (sudo prompts may follow)"
+  if sudo usermod -aG docker "$target"; then
+    echo "tcd-install: '$target' added to docker group"
+    echo "tcd-install: log out and back in (or reconnect SSH) before running 'tcd init'"
+  else
+    echo "tcd-install: warning: failed to add '$target' to docker group; do this manually:"
+    echo "  sudo usermod -aG docker $target"
+  fi
+}
+
+ensure_docker_group
