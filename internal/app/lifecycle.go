@@ -71,6 +71,35 @@ func newStopCmd() *cobra.Command {
 	}
 }
 
+func newRedeployCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "redeploy <app>",
+		Short: "Pull latest code and redeploy an app, preserving its config",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			name := args[0]
+			if _, err := loadApp(cfg, name); err != nil {
+				return err
+			}
+			fmt.Printf("→ redeploying %s\n", name)
+			state, err := deploy.Redeploy(cfg, name)
+			if err != nil {
+				return err
+			}
+			short := state.Commit
+			if len(short) > 7 {
+				short = short[:7]
+			}
+			fmt.Printf("✓ %s redeployed at %s (commit %s)\n", state.Name, state.URL, short)
+			return nil
+		},
+	}
+}
+
 func newRmCmd() *cobra.Command {
 	var purge bool
 	cmd := &cobra.Command{
